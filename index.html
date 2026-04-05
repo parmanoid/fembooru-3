@@ -1,54 +1,76 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>My Firebase Booru</title>
+  <title>TinyBooru - Firebase Edition</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { background-color: #222; color: #eee; font-family: sans-serif; margin: 0; padding: 20px; }
-    input, button { padding: 10px; margin: 5px 0; border-radius: 5px; border: none; }
-    input { width: 100%; max-width: 300px; box-sizing: border-box; }
-    button { background-color: #4CAF50; color: white; cursor: pointer; font-weight: bold; }
-    .panel { background: #333; padding: 20px; border-radius: 10px; max-width: 400px; margin: 0 auto 20px auto; }
-    #app-panel { max-width: 1000px; margin: 0 auto; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #444; }
-    .gallery { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; }
-    .post { background: #111; padding: 10px; border-radius: 8px; text-align: center; width: 170px; }
-    .post img { max-width: 150px; max-height: 150px; border-radius: 5px; object-fit: cover; }
-    .post-info { font-size: 12px; color: #888; margin-top: 5px; word-break: break-all; }
+    /* Оригинальный минималистичный стиль TinyBooru */
+    body { background-color: #1a1a1a; color: #ddd; font-family: sans-serif; margin: 0; font-size: 14px; }
+    .container { max-width: 1000px; margin: 0 auto; padding: 15px; }
+    a { color: #4CAF50; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    
+    /* Шапка и навигация */
+    #head-container { border-bottom: 1px solid #333; margin-bottom: 20px; padding-bottom: 10px; }
+    .nav-bar { display: flex; justify-content: space-between; align-items: center; background: #222; padding: 10px; border-radius: 5px; margin-top: 10px; }
+    .nav-bar input, .nav-bar button { padding: 6px 10px; background: #333; color: white; border: 1px solid #444; border-radius: 3px; font-size: 13px; }
+    .nav-bar button { cursor: pointer; transition: 0.2s; }
+    .nav-bar button:hover { background: #444; }
+    
+    /* Специфичные кнопки */
+    #btn-upload { background-color: #4CAF50; border-color: #4CAF50; font-weight: bold; }
+    #btn-upload:hover { background-color: #45a049; }
+    #btn-logout { background-color: #d32f2f; border-color: #d32f2f; }
+    
+    /* Статусы */
+    #status-msg { color: #ffeb3b; font-size: 13px; margin-left: 10px; }
+    #auth-error { color: #ff5252; font-size: 13px; margin-left: 10px; }
+
+    /* Галерея */
+    .gallery { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start; }
+    .post { background: #222; padding: 8px; border-radius: 5px; border: 1px solid #333; width: 150px; text-align: center; }
+    .post img { max-width: 150px; max-height: 150px; object-fit: cover; border-radius: 3px; }
+    .post-author { font-size: 11px; color: #888; margin-top: 8px; overflow: hidden; text-overflow: ellipsis; }
   </style>
 </head>
 <body>
 
-  <div id="auth-panel" class="panel">
-    <h2>Вход в систему</h2>
-    <input type="email" id="email" placeholder="Твоя почта">
-    <input type="password" id="pass" placeholder="Пароль">
-    <br>
-    <button id="btn-login">Войти</button>
-    <button id="btn-reg" style="background-color: #2196F3;">Зарегистрироваться</button>
-    <p id="auth-error" style="color: #ff5252; font-size: 14px;"></p>
-  </div>
-
-  <div id="app-panel" style="display:none;">
-    <div class="header">
-      <div>
-        <span id="user-email" style="font-weight: bold; color: #4CAF50; margin-right: 15px;"></span>
-        <button id="btn-logout" style="background-color: #d32f2f;">Выйти</button>
+  <div id="head-container" class="container">
+    <h2 style="margin: 0; color: #fff;">TinyBooru</h2>
+    
+    <div class="nav-bar">
+      <div id="guest-ui">
+        <input type="email" id="email" placeholder="Email" size="20">
+        <input type="password" id="pass" placeholder="Пароль" size="20">
+        <button id="btn-login">Вход</button>
+        <button id="btn-reg">Регистрация</button>
+        <span id="auth-error"></span>
       </div>
-      <div>
-        <input type="file" id="file-input" accept="image/*" style="display:inline-block; width:auto;">
-        <button id="btn-upload">Загрузить арт</button>
+
+      <div id="user-ui" style="display:none; width: 100%; justify-content: space-between; align-items: center;">
+        <div>
+          <span style="color: #888;">Аккаунт: </span>
+          <span id="user-email" style="font-weight: bold; color: #4CAF50; margin-right: 15px;"></span>
+          <button id="btn-logout">Выйти</button>
+        </div>
+        <div>
+          <input type="file" id="file-input" accept="image/*" style="width: 220px; border: none; background: transparent;">
+          <button id="btn-upload">Загрузить арт</button>
+          <span id="status-msg"></span>
+        </div>
       </div>
     </div>
-    <p id="upload-status" style="color: #ffeb3b; text-align: right;"></p>
-    
+  </div>
+
+  <div id="main-container" class="container">
     <div class="gallery" id="gallery-container">
-      <p>Загрузка постов...</p>
+      <p style="color: #888;">Загрузка постов...</p>
     </div>
   </div>
 
   <script type="module">
+    // --- 1. ИНИЦИАЛИЗАЦИЯ БАЗЫ ---
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
     import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
@@ -68,93 +90,111 @@
     const db = getDatabase(app);
     const imgbbKey = "120a27bcbb28d3ffd9f03bc4b32bb54f";
 
-    const authPanel = document.getElementById('auth-panel');
-    const appPanel = document.getElementById('app-panel');
+    // --- 2. ЭЛЕМЕНТЫ ИНТЕРФЕЙСА ---
+    const guestUi = document.getElementById('guest-ui');
+    const userUi = document.getElementById('user-ui');
     const authError = document.getElementById('auth-error');
-    const uploadStatus = document.getElementById('upload-status');
+    const statusMsg = document.getElementById('status-msg');
     const gallery = document.getElementById('gallery-container');
     let currentUser = null;
 
+    // --- 3. СЛУШАТЕЛЬ АВТОРИЗАЦИИ ---
     onAuthStateChanged(auth, (user) => {
+      authError.innerText = ""; // Очищаем ошибки при смене статуса
       if (user) {
         currentUser = user;
-        authPanel.style.display = 'none';
-        appPanel.style.display = 'block';
-        document.getElementById('user-email').innerText = user.email;
-        loadPosts();
+        guestUi.style.display = 'none';
+        userUi.style.display = 'flex';
+        document.getElementById('user-email').innerText = user.email.split('@')[0]; // Показываем ник до @
       } else {
         currentUser = null;
-        authPanel.style.display = 'block';
-        appPanel.style.display = 'none';
+        guestUi.style.display = 'block';
+        userUi.style.display = 'none';
       }
     });
 
-    document.getElementById('btn-reg').onclick = () => {
+    // --- 4. ФУНКЦИИ АККАУНТА ---
+    document.getElementById('btn-reg').addEventListener('click', () => {
       const e = document.getElementById('email').value;
       const p = document.getElementById('pass').value;
-      createUserWithEmailAndPassword(auth, e, p).catch(err => authError.innerText = err.message);
-    };
+      if(e && p) createUserWithEmailAndPassword(auth, e, p).catch(err => authError.innerText = "Ошибка: " + err.message);
+    });
 
-    document.getElementById('btn-login').onclick = () => {
+    document.getElementById('btn-login').addEventListener('click', () => {
       const e = document.getElementById('email').value;
       const p = document.getElementById('pass').value;
-      signInWithEmailAndPassword(auth, e, p).catch(err => authError.innerText = err.message);
-    };
+      if(e && p) signInWithEmailAndPassword(auth, e, p).catch(err => authError.innerText = "Неверный логин или пароль");
+    });
 
-    document.getElementById('btn-logout').onclick = () => signOut(auth);
+    document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
 
-    document.getElementById('btn-upload').onclick = async () => {
+    // --- 5. ЗАГРУЗКА ФАЙЛОВ ---
+    document.getElementById('btn-upload').addEventListener('click', async () => {
       const file = document.getElementById('file-input').files[0];
-      if(!file) { uploadStatus.innerText = "Сначала выбери файл"; return; }
+      if(!file) { statusMsg.innerText = "Выберите файл!"; return; }
 
-      uploadStatus.innerText = "Грузим на ImgBB...";
+      statusMsg.innerText = "Загрузка на сервер...";
+      document.getElementById('btn-upload').disabled = true;
+
       const formData = new FormData();
       formData.append('image', file);
       formData.append('key', imgbbKey);
 
       try {
         const res = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: formData }).then(r => r.json());
-        if(!res.success) throw new Error("Ошибка загрузки");
+        if(!res.success) throw new Error("Ошибка ImgBB");
 
-        uploadStatus.innerText = "Сохраняем в базу...";
-        const postsRef = ref(db, 'posts');
-        await push(postsRef, {
+        statusMsg.innerText = "Добавление в базу...";
+        await push(ref(db, 'posts'), {
           file_url: res.data.url,
           preview_url: res.data.thumb.url,
           author: currentUser.email,
           timestamp: Date.now()
         });
 
-        uploadStatus.innerText = "Готово!";
-        document.getElementById('file-input').value = "";
-        setTimeout(() => uploadStatus.innerText = "", 3000);
+        statusMsg.innerText = "Успешно!";
+        document.getElementById('file-input').value = ""; // Очищаем поле
+        setTimeout(() => statusMsg.innerText = "", 3000);
       } catch (err) {
-        uploadStatus.innerText = "Ошибка: " + err.message;
+        statusMsg.innerText = "Ошибка: " + err.message;
+      } finally {
+        document.getElementById('btn-upload').disabled = false;
       }
-    };
+    });
 
-    function loadPosts() {
-      const postsRef = ref(db, 'posts');
-      onValue(postsRef, (snapshot) => {
+    // --- 6. РЕНДЕР ГАЛЕРЕИ (РАБОТАЕТ ВСЕГДА) ---
+    function loadGallery() {
+      onValue(ref(db, 'posts'), (snapshot) => {
         gallery.innerHTML = "";
         const data = snapshot.val();
-        if(!data) { gallery.innerHTML = "<p>Пока нет постов</p>"; return; }
+        
+        if(!data) { 
+          gallery.innerHTML = "<p style='color: #888;'>Здесь пока пусто. Станьте первым, кто добавит арт!</p>"; 
+          return; 
+        }
 
+        // Превращаем объект в массив и сортируем новые посты наверх
         const postsArray = Object.values(data).sort((a, b) => b.timestamp - a.timestamp);
         
         postsArray.forEach(post => {
           const div = document.createElement('div');
           div.className = 'post';
+          // Имя автора до символа @ для красоты
+          const authorName = post.author ? post.author.split('@')[0] : 'Аноним'; 
+          
           div.innerHTML = `
             <a href="${post.file_url}" target="_blank">
-              <img src="${post.preview_url}">
+              <img src="${post.preview_url}" alt="art">
             </a>
-            <div class="post-info">От: ${post.author.split('@')[0]}</div>
+            <div class="post-author">By: ${authorName}</div>
           `;
           gallery.appendChild(div);
         });
       });
     }
+
+    // Запускаем загрузку галереи сразу при открытии сайта
+    loadGallery();
   </script>
 </body>
 </html>
