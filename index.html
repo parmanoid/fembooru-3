@@ -11,18 +11,28 @@
     <link href="css/style.css" rel="stylesheet">
     <style>
       #upload-modal { display:none; position:fixed; bottom:20px; right:20px; background:#222; color:#fff; padding:20px; border-radius:10px; box-shadow:0 0 10px #000; z-index:9999; }
-      #upload-modal input, #upload-modal button { margin-top:10px; width:100%; display:block; padding:8px; }
+      #upload-modal input, #upload-modal button { margin-top:10px; width:100%; display:block; padding:8px; box-sizing: border-box; }
+      #upload-modal label { font-size: 14px; color: #aaa; }
       #upload-toggle { position:fixed; bottom:20px; right:20px; padding:12px 24px; background:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer; z-index:9998; font-weight:bold; }
     </style>
   </head>
   <body>
-    <button id="upload-toggle" onclick="document.getElementById('upload-modal').style.display='block'; this.style.display='none';">Загрузить файл</button>
+    <button id="upload-toggle" onclick="document.getElementById('upload-modal').style.display='block'; this.style.display='none';">Загрузить пост</button>
     <div id="upload-modal">
       <h3 style="margin-top:0">Новый пост</h3>
+      
+      <label>1. Выбери файл (картинка/короткое видео):</label>
       <input type="file" id="file-input" accept="image/*,video/*">
-      <button onclick="uploadMagic()">Отправить</button>
-      <p id="upload-status"></p>
-      <button onclick="document.getElementById('upload-modal').style.display='none'; document.getElementById('upload-toggle').style.display='block';" style="background:#d32f2f; color:white; margin-top:15px;">Закрыть</button>
+      
+      <div style="text-align:center; margin: 10px 0; color: #666;">— ИЛИ —</div>
+      
+      <label>2. Вставь готовую прямую ссылку:</label>
+      <input type="text" id="url-input" placeholder="https://files.catbox.moe/...">
+
+      <button onclick="uploadMagic()" style="background: #4CAF50; border: none; color: white; font-weight: bold; cursor: pointer;">Отправить в базу</button>
+      <p id="upload-status" style="font-size: 13px; color: #ffeb3b;"></p>
+      
+      <button onclick="document.getElementById('upload-modal').style.display='none'; document.getElementById('upload-toggle').style.display='block';" style="background:#d32f2f; color:white; border:none; cursor: pointer;">Закрыть</button>
     </div>
 
     <script>
@@ -36,36 +46,53 @@
 
       async function uploadMagic() {
         var file = document.getElementById('file-input').files[0];
+        var urlInput = document.getElementById('url-input').value.trim();
         var status = document.getElementById('upload-status');
-        if(!file) { status.innerText = "Выбери файл!"; return; }
+        
+        if(!file && !urlInput) { status.innerText = "Выбери файл ИЛИ вставь ссылку!"; return; }
 
-        var isVideo = file.type.startsWith('video/');
         var fileUrl = "";
         var thumbUrl = "";
+        var isVideo = false;
 
         try {
-          if (isVideo) {
-            status.innerText = "Шаг 1: Загрузка видео на Catbox...";
-            var formData = new FormData();
-            formData.append('reqtype', 'fileupload');
-            formData.append('fileToUpload', file);
+          if (urlInput) {
+            // РЕЖИМ 1: Пользователь вставил готовую ссылку
+            status.innerText = "Обработка прямой ссылки...";
+            fileUrl = urlInput;
+            isVideo = fileUrl.endsWith('.mp4') || fileUrl.endsWith('.webm');
             
-            var catboxRes = await fetch('https://catbox.moe/user/api.php', { method: 'POST', body: formData }).then(r => r.text());
-            if(!catboxRes.startsWith("http")) throw new Error("Catbox отклонил файл");
+            // Если это картинка, используем саму картинку как превью. Если видео - ставим заглушку.
+            thumbUrl = isVideo ? "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'><rect width='150' height='150' fill='%23333'/><text x='50%' y='50%' fill='white' font-size='60' text-anchor='middle' dominant-baseline='middle'>▶</text></svg>" : fileUrl;
             
-            fileUrl = catboxRes;
-            thumbUrl = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'><rect width='150' height='150' fill='%23333'/><text x='50%' y='50%' fill='white' font-size='60' text-anchor='middle' dominant-baseline='middle'>▶</text></svg>";
           } else {
-            status.innerText = "Шаг 1: Загрузка картинки на ImgBB...";
-            var formData = new FormData();
-            formData.append('image', file);
-            formData.append('key', IMGBB_API);
+            // РЕЖИМ 2: Загрузка файла
+            isVideo = file.type.startsWith('video/');
             
-            var imgRes = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: formData }).then(r => r.json());
-            if(!imgRes.success) throw new Error("ImgBB отклонил картинку");
-            
-            fileUrl = imgRes.data.url;
-            thumbUrl = imgRes.data.thumb.url;
+            if (isVideo) {
+              status.innerText = "Шаг 1: Загрузка видео через прокси...";
+              var formData = new FormData();
+              formData.append('reqtype', 'fileupload');
+              formData.append('fileToUpload', file);
+              
+              // Используем corsproxy.io чтобы обмануть блокировку браузера
+              var catboxRes = await fetch('https://corsproxy.io/?https://catbox.moe/user/api.php', { method: 'POST', body: formData }).then(r => r.text());
+              if(!catboxRes.startsWith("http")) throw new Error("Сервер отклонил файл (возможно он слишком большой)");
+              
+              fileUrl = catboxRes;
+              thumbUrl = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'><rect width='150' height='150' fill='%23333'/><text x='50%' y='50%' fill='white' font-size='60' text-anchor='middle' dominant-baseline='middle'>▶</text></svg>";
+            } else {
+              status.innerText = "Шаг 1: Загрузка картинки на ImgBB...";
+              var formData = new FormData();
+              formData.append('image', file);
+              formData.append('key', IMGBB_API);
+              
+              var imgRes = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: formData }).then(r => r.json());
+              if(!imgRes.success) throw new Error("ImgBB отклонил картинку");
+              
+              fileUrl = imgRes.data.url;
+              thumbUrl = imgRes.data.thumb.url;
+            }
           }
 
           var newPost = {
@@ -101,6 +128,11 @@
           await fetch(ghUrl, { method: "PUT", headers: headers, body: JSON.stringify(updateData) });
 
           status.innerText = "Готово! Обновляю страницу...";
+          
+          // Очищаем поля
+          document.getElementById('file-input').value = "";
+          document.getElementById('url-input').value = "";
+          
           setTimeout(() => location.reload(), 1500);
 
         } catch (e) {
