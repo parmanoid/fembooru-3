@@ -16,17 +16,16 @@
     </style>
   </head>
   <body>
-    <button id="upload-toggle" onclick="document.getElementById('upload-modal').style.display='block'; this.style.display='none';">Загрузить картинку</button>
+    <button id="upload-toggle" onclick="document.getElementById('upload-modal').style.display='block'; this.style.display='none';">Загрузить файл</button>
     <div id="upload-modal">
       <h3 style="margin-top:0">Новый пост</h3>
-      <input type="file" id="file-input">
+      <input type="file" id="file-input" accept="image/*,video/*">
       <button onclick="uploadMagic()">Отправить</button>
       <p id="upload-status"></p>
       <button onclick="document.getElementById('upload-modal').style.display='none'; document.getElementById('upload-toggle').style.display='block';" style="background:#d32f2f; color:white; margin-top:15px;">Закрыть</button>
     </div>
 
     <script>
-      // ТВОИ НАСТРОЙКИ
       var IMGBB_API = "120a27bcbb28d3ffd9f03bc4b32bb54f";
       var GH_USER = "parmanoid";
       var GH_REPO = "fembooru-3"; 
@@ -40,21 +39,41 @@
         var status = document.getElementById('upload-status');
         if(!file) { status.innerText = "Выбери файл!"; return; }
 
-        status.innerText = "Шаг 1: Загрузка на ImgBB...";
-        var formData = new FormData();
-        formData.append('image', file);
-        formData.append('key', IMGBB_API);
+        var isVideo = file.type.startsWith('video/');
+        var fileUrl = "";
+        var thumbUrl = "";
 
         try {
-          var imgRes = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: formData }).then(r => r.json());
-          if(!imgRes.success) throw new Error("Ошибка ImgBB");
-          
+          if (isVideo) {
+            status.innerText = "Шаг 1: Загрузка видео на Catbox...";
+            var formData = new FormData();
+            formData.append('reqtype', 'fileupload');
+            formData.append('fileToUpload', file);
+            
+            var catboxRes = await fetch('https://catbox.moe/user/api.php', { method: 'POST', body: formData }).then(r => r.text());
+            if(!catboxRes.startsWith("http")) throw new Error("Catbox отклонил файл");
+            
+            fileUrl = catboxRes;
+            thumbUrl = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'><rect width='150' height='150' fill='%23333'/><text x='50%' y='50%' fill='white' font-size='60' text-anchor='middle' dominant-baseline='middle'>▶</text></svg>";
+          } else {
+            status.innerText = "Шаг 1: Загрузка картинки на ImgBB...";
+            var formData = new FormData();
+            formData.append('image', file);
+            formData.append('key', IMGBB_API);
+            
+            var imgRes = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: formData }).then(r => r.json());
+            if(!imgRes.success) throw new Error("ImgBB отклонил картинку");
+            
+            fileUrl = imgRes.data.url;
+            thumbUrl = imgRes.data.thumb.url;
+          }
+
           var newPost = {
-            file_url: imgRes.data.url,
-            preview_url: imgRes.data.thumb.url,
+            file_url: fileUrl,
+            preview_url: thumbUrl,
             preview_width: 150,
             preview_height: 150,
-            tags: "my_upload"
+            tags: isVideo ? "video my_upload" : "image my_upload"
           };
 
           status.innerText = "Шаг 2: Получаем базу с Github...";
@@ -74,7 +93,7 @@
 
           status.innerText = "Шаг 3: Сохраняем обратно...";
           var updateData = {
-            message: "Авто-загрузка картинки",
+            message: "Авто-загрузка файла",
             content: encodeUTF8(JSON.stringify(posts, null, 2)),
             sha: sha
           };
