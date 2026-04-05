@@ -1,183 +1,160 @@
 <!DOCTYPE html>
-<html manifest="offline.appcache">
-  <head>
-    <title>TinyBooru - The Tiny Booru Frontend</title>
-    <meta charset="utf-8" />
-    <meta name="author" content="urain39" />
-    <meta name="keywords" content="Booru, TinyBooru, SafeBooru" />
-    <meta name="description" content="The Tiny Booru Frontend" />
-    <meta name="viewport" content="initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, width=device-width">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
-    <link href="css/style.css" rel="stylesheet">
-    <style>
-      #upload-modal { display:none; position:fixed; bottom:20px; right:20px; background:#222; color:#fff; padding:20px; border-radius:10px; box-shadow:0 0 10px #000; z-index:9999; }
-      #upload-modal input, #upload-modal button { margin-top:10px; width:100%; display:block; padding:8px; box-sizing: border-box; }
-      #upload-modal label { font-size: 14px; color: #aaa; }
-      #upload-toggle { position:fixed; bottom:20px; right:20px; padding:12px 24px; background:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer; z-index:9998; font-weight:bold; }
-    </style>
-  </head>
-  <body>
-    <button id="upload-toggle" onclick="document.getElementById('upload-modal').style.display='block'; this.style.display='none';">Загрузить пост</button>
-    <div id="upload-modal">
-      <h3 style="margin-top:0">Новый пост</h3>
-      
-      <label>1. Выбери файл (картинка/короткое видео):</label>
-      <input type="file" id="file-input" accept="image/*,video/*">
-      
-      <div style="text-align:center; margin: 10px 0; color: #666;">— ИЛИ —</div>
-      
-      <label>2. Вставь готовую прямую ссылку:</label>
-      <input type="text" id="url-input" placeholder="https://files.catbox.moe/...">
+<html>
+<head>
+  <title>My Firebase Booru</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { background-color: #222; color: #eee; font-family: sans-serif; margin: 0; padding: 20px; }
+    input, button { padding: 10px; margin: 5px 0; border-radius: 5px; border: none; }
+    input { width: 100%; max-width: 300px; box-sizing: border-box; }
+    button { background-color: #4CAF50; color: white; cursor: pointer; font-weight: bold; }
+    .panel { background: #333; padding: 20px; border-radius: 10px; max-width: 400px; margin: 0 auto 20px auto; }
+    #app-panel { max-width: 1000px; margin: 0 auto; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #444; }
+    .gallery { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; }
+    .post { background: #111; padding: 10px; border-radius: 8px; text-align: center; width: 170px; }
+    .post img { max-width: 150px; max-height: 150px; border-radius: 5px; object-fit: cover; }
+    .post-info { font-size: 12px; color: #888; margin-top: 5px; word-break: break-all; }
+  </style>
+</head>
+<body>
 
-      <button onclick="uploadMagic()" style="background: #4CAF50; border: none; color: white; font-weight: bold; cursor: pointer;">Отправить в базу</button>
-      <p id="upload-status" style="font-size: 13px; color: #ffeb3b;"></p>
-      
-      <button onclick="document.getElementById('upload-modal').style.display='none'; document.getElementById('upload-toggle').style.display='block';" style="background:#d32f2f; color:white; border:none; cursor: pointer;">Закрыть</button>
+  <div id="auth-panel" class="panel">
+    <h2>Вход в систему</h2>
+    <input type="email" id="email" placeholder="Твоя почта">
+    <input type="password" id="pass" placeholder="Пароль">
+    <br>
+    <button id="btn-login">Войти</button>
+    <button id="btn-reg" style="background-color: #2196F3;">Зарегистрироваться</button>
+    <p id="auth-error" style="color: #ff5252; font-size: 14px;"></p>
+  </div>
+
+  <div id="app-panel" style="display:none;">
+    <div class="header">
+      <div>
+        <span id="user-email" style="font-weight: bold; color: #4CAF50; margin-right: 15px;"></span>
+        <button id="btn-logout" style="background-color: #d32f2f;">Выйти</button>
+      </div>
+      <div>
+        <input type="file" id="file-input" accept="image/*" style="display:inline-block; width:auto;">
+        <button id="btn-upload">Загрузить арт</button>
+      </div>
     </div>
+    <p id="upload-status" style="color: #ffeb3b; text-align: right;"></p>
+    
+    <div class="gallery" id="gallery-container">
+      <p>Загрузка постов...</p>
+    </div>
+  </div>
 
-    <script>
-      var IMGBB_API = "120a27bcbb28d3ffd9f03bc4b32bb54f";
-      var GH_USER = "parmanoid";
-      var GH_REPO = "fembooru-3"; 
-      var GH_TOKEN = "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";
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+    import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
-      function encodeUTF8(str) { return btoa(unescape(encodeURIComponent(str))); }
-      function decodeUTF8(str) { return decodeURIComponent(escape(atob(str))); }
+    const firebaseConfig = {
+      apiKey: "AIzaSyAu8tzzrqKizHt2_0_-6r6DJU02szqtgEA",
+      authDomain: "fir-3fa84.firebaseapp.com",
+      projectId: "fir-3fa84",
+      storageBucket: "fir-3fa84.firebasestorage.app",
+      messagingSenderId: "725404219596",
+      appId: "1:725404219596:web:34ab5087aeed5b9bb1aa69",
+      measurementId: "G-X25715CQHB"
+    };
 
-      async function uploadMagic() {
-        var file = document.getElementById('file-input').files[0];
-        var urlInput = document.getElementById('url-input').value.trim();
-        var status = document.getElementById('upload-status');
-        
-        if(!file && !urlInput) { status.innerText = "Выбери файл ИЛИ вставь ссылку!"; return; }
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+    const imgbbKey = "120a27bcbb28d3ffd9f03bc4b32bb54f";
 
-        var fileUrl = "";
-        var thumbUrl = "";
-        var isVideo = false;
+    const authPanel = document.getElementById('auth-panel');
+    const appPanel = document.getElementById('app-panel');
+    const authError = document.getElementById('auth-error');
+    const uploadStatus = document.getElementById('upload-status');
+    const gallery = document.getElementById('gallery-container');
+    let currentUser = null;
 
-        try {
-          if (urlInput) {
-            // РЕЖИМ 1: Пользователь вставил готовую ссылку
-            status.innerText = "Обработка прямой ссылки...";
-            fileUrl = urlInput;
-            isVideo = fileUrl.endsWith('.mp4') || fileUrl.endsWith('.webm');
-            
-            // Если это картинка, используем саму картинку как превью. Если видео - ставим заглушку.
-            thumbUrl = isVideo ? "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'><rect width='150' height='150' fill='%23333'/><text x='50%' y='50%' fill='white' font-size='60' text-anchor='middle' dominant-baseline='middle'>▶</text></svg>" : fileUrl;
-            
-          } else {
-            // РЕЖИМ 2: Загрузка файла
-            isVideo = file.type.startsWith('video/');
-            
-            if (isVideo) {
-              status.innerText = "Шаг 1: Загрузка видео через прокси...";
-              var formData = new FormData();
-              formData.append('reqtype', 'fileupload');
-              formData.append('fileToUpload', file);
-              
-              // Используем corsproxy.io чтобы обмануть блокировку браузера
-              var catboxRes = await fetch('https://corsproxy.io/?https://catbox.moe/user/api.php', { method: 'POST', body: formData }).then(r => r.text());
-              if(!catboxRes.startsWith("http")) throw new Error("Сервер отклонил файл (возможно он слишком большой)");
-              
-              fileUrl = catboxRes;
-              thumbUrl = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'><rect width='150' height='150' fill='%23333'/><text x='50%' y='50%' fill='white' font-size='60' text-anchor='middle' dominant-baseline='middle'>▶</text></svg>";
-            } else {
-              status.innerText = "Шаг 1: Загрузка картинки на ImgBB...";
-              var formData = new FormData();
-              formData.append('image', file);
-              formData.append('key', IMGBB_API);
-              
-              var imgRes = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: formData }).then(r => r.json());
-              if(!imgRes.success) throw new Error("ImgBB отклонил картинку");
-              
-              fileUrl = imgRes.data.url;
-              thumbUrl = imgRes.data.thumb.url;
-            }
-          }
-
-          var newPost = {
-            file_url: fileUrl,
-            preview_url: thumbUrl,
-            preview_width: 150,
-            preview_height: 150,
-            tags: isVideo ? "video my_upload" : "image my_upload"
-          };
-
-          status.innerText = "Шаг 2: Получаем базу с Github...";
-          var ghUrl = "https://api.github.com/repos/" + GH_USER + "/" + GH_REPO + "/contents/posts.json";
-          var headers = { "Authorization": "token " + GH_TOKEN, "Accept": "application/vnd.github.v3+json" };
-          
-          var fileRes = await fetch(ghUrl, { headers: headers }).then(r => r.json());
-          var posts = [];
-          var sha = "";
-          
-          if(fileRes.content) {
-            posts = JSON.parse(decodeUTF8(fileRes.content));
-            sha = fileRes.sha;
-          }
-          
-          posts.unshift(newPost);
-
-          status.innerText = "Шаг 3: Сохраняем обратно...";
-          var updateData = {
-            message: "Авто-загрузка файла",
-            content: encodeUTF8(JSON.stringify(posts, null, 2)),
-            sha: sha
-          };
-
-          await fetch(ghUrl, { method: "PUT", headers: headers, body: JSON.stringify(updateData) });
-
-          status.innerText = "Готово! Обновляю страницу...";
-          
-          // Очищаем поля
-          document.getElementById('file-input').value = "";
-          document.getElementById('url-input').value = "";
-          
-          setTimeout(() => location.reload(), 1500);
-
-        } catch (e) {
-          status.innerText = "Ошибка: " + e.message;
-        }
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        currentUser = user;
+        authPanel.style.display = 'none';
+        appPanel.style.display = 'block';
+        document.getElementById('user-email').innerText = user.email;
+        loadPosts();
+      } else {
+        currentUser = null;
+        authPanel.style.display = 'block';
+        appPanel.style.display = 'none';
       }
-    </script>
-    <div id="viewport"></div>
-    <script id="viewport-tpl" type="text/x-template">
-      <div id="head-container" class="container">
-        <div id="title-wrapper">
-          {#helpers.title}{-- This just a test, do not ask me why! --}
-        </div>
-        <div class="search-bar">
-          <button id="btn-search" class="btn">Search</button>
-          {?params.page}
-            {-}<input id="search-box" type="text" size="8" value="{params.tags}">
-          {/params.page}
-        </div>
-        <div class="nav-bar">
-          {?params.page}
-            <a id="btn-prev-page" href="#!">Prev</a>
-            <span>{params.page}</span>
-            <a id="btn-next-page" href="#!">Next</a>
-          {*params.page}
-            {-- page 0 --}
-            <a href="#!">Help</a><a href="#!">About</a>
-            <a href="mailto:hexiedeshijie@gmail.com">Contact</a>
-          {/params.page}
-        </div>
-      </div>
-      <div id="main-container" class="container">
-        {-}{@post-viewer-tpl}
-      </div>
-      <div id="footer-container" class="container">
-        <section>
-          &copy; 2018-{helpers.fullYear} TinyBooru. 由ij2tpl.js走心驱动。
-        </section>
-      </div>
-    </script>
-    <script src="js/lib/vconsole.min.js"></script>
-    <script src="js/lib/jquery.min.js"></script>
-    <script src="js/lib/waiter.min.js"></script>
-    <script src="js/lib/ij2tpl.min.js"></script>
-    <script src="js/lib/format.js"></script>
-    <script src="js/tinybooru.js"></script>
-  </body>
+    });
+
+    document.getElementById('btn-reg').onclick = () => {
+      const e = document.getElementById('email').value;
+      const p = document.getElementById('pass').value;
+      createUserWithEmailAndPassword(auth, e, p).catch(err => authError.innerText = err.message);
+    };
+
+    document.getElementById('btn-login').onclick = () => {
+      const e = document.getElementById('email').value;
+      const p = document.getElementById('pass').value;
+      signInWithEmailAndPassword(auth, e, p).catch(err => authError.innerText = err.message);
+    };
+
+    document.getElementById('btn-logout').onclick = () => signOut(auth);
+
+    document.getElementById('btn-upload').onclick = async () => {
+      const file = document.getElementById('file-input').files[0];
+      if(!file) { uploadStatus.innerText = "Сначала выбери файл"; return; }
+
+      uploadStatus.innerText = "Грузим на ImgBB...";
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('key', imgbbKey);
+
+      try {
+        const res = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: formData }).then(r => r.json());
+        if(!res.success) throw new Error("Ошибка загрузки");
+
+        uploadStatus.innerText = "Сохраняем в базу...";
+        const postsRef = ref(db, 'posts');
+        await push(postsRef, {
+          file_url: res.data.url,
+          preview_url: res.data.thumb.url,
+          author: currentUser.email,
+          timestamp: Date.now()
+        });
+
+        uploadStatus.innerText = "Готово!";
+        document.getElementById('file-input').value = "";
+        setTimeout(() => uploadStatus.innerText = "", 3000);
+      } catch (err) {
+        uploadStatus.innerText = "Ошибка: " + err.message;
+      }
+    };
+
+    function loadPosts() {
+      const postsRef = ref(db, 'posts');
+      onValue(postsRef, (snapshot) => {
+        gallery.innerHTML = "";
+        const data = snapshot.val();
+        if(!data) { gallery.innerHTML = "<p>Пока нет постов</p>"; return; }
+
+        const postsArray = Object.values(data).sort((a, b) => b.timestamp - a.timestamp);
+        
+        postsArray.forEach(post => {
+          const div = document.createElement('div');
+          div.className = 'post';
+          div.innerHTML = `
+            <a href="${post.file_url}" target="_blank">
+              <img src="${post.preview_url}">
+            </a>
+            <div class="post-info">От: ${post.author.split('@')[0]}</div>
+          `;
+          gallery.appendChild(div);
+        });
+      });
+    }
+  </script>
+</body>
 </html>
