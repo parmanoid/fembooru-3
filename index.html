@@ -1,320 +1,409 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-    <title>Ultimate Booru-Tube P2P</title>
+    <title>BooruTube - Stable Edition</title>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        :root { --main-bg: #0f0f0f; --accent: #ff0000; --text: #f1f1f1; --panel: #212121; }
-        body { background: var(--main-bg); color: var(--text); font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; overflow-x: hidden; }
+        /* === БАЗОВІ СТИЛІ === */
+        :root { --bg: #121212; --panel: #1e1e1e; --accent: #ff4757; --text: #ffffff; --text-muted: #a4b0be; }
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); overflow-x: hidden; }
+        * { box-sizing: border-box; }
+        button, input, textarea { font-family: inherit; }
+        a { color: var(--accent); text-decoration: none; cursor: pointer; }
+
+        /* === НАВІГАЦІЯ === */
+        header { background: var(--panel); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .tabs { display: flex; gap: 10px; }
+        .tab-btn { background: transparent; border: 2px solid transparent; color: var(--text); padding: 8px 16px; border-radius: 20px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .tab-btn:hover { background: rgba(255, 255, 255, 0.1); }
+        .tab-btn.active { background: var(--accent); color: white; }
         
-        /* Анімації */
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .post-card { animation: fadeIn 0.4s ease-out; }
+        .user-block { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: bold; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; background: #333; object-fit: cover; }
+        .action-btn { background: var(--accent); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
 
-        /* Навігація */
-        header { background: var(--panel); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
-        .tabs { display: flex; gap: 15px; }
-        .tab-link { cursor: pointer; padding: 8px 15px; border-radius: 20px; transition: 0.3s; font-weight: bold; }
-        .tab-link:hover, .tab-link.active { background: var(--accent); color: white; }
+        /* === КОНТЕЙНЕРИ СТОРІНОК === */
+        .page { display: none; padding: 20px; min-height: 90vh; }
+        .page.active { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; align-content: flex-start; }
+        #page-shorts.active { display: block; padding: 0; height: calc(100vh - 60px); overflow-y: scroll; scroll-snap-type: y mandatory; }
 
-        /* Профіль (Зліва зверху) */
-        .profile-trigger { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-        .avatar { width: 35px; height: 35px; border-radius: 50%; background: #444; border: 2px solid var(--accent); object-fit: cover; }
+        /* === КАРТКИ ПОСТІВ (Борда / YouTube) === */
+        .post-card { background: var(--panel); border-radius: 10px; width: 300px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .post-media { width: 100%; height: 200px; background: #000; display: flex; align-items: center; justify-content: center; }
+        .post-media img, .post-media video { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .post-info { padding: 15px; }
+        .post-author { color: var(--accent); font-weight: bold; margin-bottom: 5px; display: inline-block; cursor: pointer; }
+        .post-desc { font-size: 14px; color: var(--text-muted); margin-bottom: 10px; word-wrap: break-word; }
+        .post-stats { display: flex; justify-content: space-between; font-size: 14px; border-top: 1px solid #333; padding-top: 10px; }
+        .stat-btn { cursor: pointer; user-select: none; transition: 0.2s; }
+        .stat-btn:hover { color: var(--accent); transform: scale(1.1); }
 
-        /* Галерея та Відео */
-        .content-grid { display: flex; flex-wrap: wrap; gap: 15px; padding: 20px; justify-content: center; }
-        .post-card { background: var(--panel); border-radius: 12px; width: 280px; overflow: hidden; position: relative; }
-        .post-card img, .post-card video { width: 100%; height: 180px; object-fit: cover; display: block; }
-        .post-meta { padding: 10px; font-size: 13px; }
-        .post-author { color: var(--accent); font-weight: bold; }
+        /* === SHORTS === */
+        .short-wrapper { height: 100%; width: 100%; scroll-snap-align: start; position: relative; background: #000; display: flex; justify-content: center; }
+        .short-video { height: 100%; max-width: 100%; object-fit: contain; }
+        .short-ui { position: absolute; right: 15px; bottom: 80px; display: flex; flex-direction: column; gap: 25px; align-items: center; }
+        .short-btn { background: rgba(0,0,0,0.5); border-radius: 50%; width: 50px; height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; color: white; }
+        .short-btn span { font-size: 12px; margin-top: 2px; }
 
-        /* Shorts Layout (Мобільний та ПК) */
-        .shorts-container { display: none; height: calc(100vh - 60px); scroll-snap-type: y mandatory; overflow-y: scroll; background: black; }
-        .short-video-wrapper { height: 100%; width: 100%; scroll-snap-align: start; position: relative; display: flex; justify-content: center; align-items: center; }
-        .short-v { height: 100%; max-width: 100%; object-fit: contain; }
-        .short-ui { position: absolute; right: 10px; bottom: 100px; display: flex; flex-direction: column; gap: 20px; text-align: center; }
-        .action-btn { background: rgba(255,255,255,0.1); border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; backdrop-filter: blur(5px); }
-
-        /* Підказки (Autocomplete) */
-        #autocomplete-box { position: absolute; background: #333; border: 1px solid #555; display: none; z-index: 2000; width: 200px; }
-        .hint-item { padding: 8px; cursor: pointer; border-bottom: 1px solid #444; }
-        .hint-item:hover { background: var(--accent); }
-
-        /* Модальні вікна */
-        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--panel); padding: 25px; border-radius: 15px; z-index: 3000; width: 90%; max-width: 400px; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
-        .modal input, .modal textarea { width: 100%; margin-bottom: 10px; background: #111; color: white; border: 1px solid #444; padding: 10px; box-sizing: border-box; }
+        /* === ПРОФІЛЬ === */
+        .profile-header { width: 100%; text-align: center; padding: 20px; background: var(--panel); border-radius: 10px; margin-bottom: 20px; }
         
+        /* === МОДАЛКИ === */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
+        .modal { background: var(--panel); padding: 30px; border-radius: 10px; width: 90%; max-width: 400px; display: flex; flex-direction: column; gap: 15px; }
+        .modal input, .modal textarea { width: 100%; padding: 10px; border: 1px solid #444; background: #111; color: white; border-radius: 5px; }
+        .modal button { padding: 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-secondary { background: #555; color: white; }
+
         /* Мобільна адаптація */
         @media (max-width: 600px) {
+            .tabs { position: fixed; bottom: 0; left: 0; width: 100%; background: var(--panel); justify-content: space-around; padding: 10px 0; z-index: 100; }
             .post-card { width: 100%; }
-            .header { padding: 10px; }
-            .short-ui { right: 5px; }
+            #page-shorts { height: calc(100vh - 120px); } /* Відступ для нижнього меню */
         }
     </style>
 </head>
 <body>
 
 <header>
-    <div class="profile-trigger" onclick="togglePage('profile')">
-        <img id="my-avatar" class="avatar" src="https://www.gravatar.com/avatar/0?d=mp">
-        <span id="my-nick">Гість</span>
+    <div class="user-block" onclick="openProfile()">
+        <img id="nav-avatar" class="avatar" src="https://ui-avatars.com/api/?name=Guest&background=random">
+        <span id="nav-nick">Гість</span>
     </div>
     <div class="tabs">
-        <div class="tab-link active" onclick="togglePage('booru')">Борда</div>
-        <div class="tab-link" onclick="togglePage('youtube')">YouTube</div>
-        <div class="tab-link" onclick="togglePage('shorts')">Shorts</div>
+        <button class="tab-btn active" onclick="switchTab('booru', this)">Борда</button>
+        <button class="tab-btn" onclick="switchTab('youtube', this)">YouTube</button>
+        <button class="tab-btn" onclick="switchTab('shorts', this)">Shorts</button>
     </div>
-    <button onclick="document.getElementById('upload-modal').style.display='block'" id="upload-btn" style="display:none; background: var(--accent); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor:pointer;">+</button>
+    <button class="action-btn" id="nav-upload-btn" style="display:none;" onclick="showModal('upload-modal')">Завантажити</button>
 </header>
 
-<div id="page-booru" class="content-grid"></div>
-<div id="page-youtube" class="content-grid" style="display:none"></div>
-<div id="page-shorts" class="shorts-container"></div>
-<div id="page-profile" class="container" style="display:none; padding: 40px 20px;">
-    <div style="text-align: center;">
-        <img id="prof-avatar" class="avatar" style="width: 100px; height: 100px;">
-        <h2 id="prof-nick">Завантаження...</h2>
-        <p id="prof-bio">Про себе не вказано</p>
-        <button onclick="editProfile()">Налаштувати профіль</button>
-        <button onclick="firebase.auth().signOut()" style="background: gray;">Вийти</button>
+<main>
+    <div id="page-booru" class="page active"></div>
+    <div id="page-youtube" class="page"></div>
+    <div id="page-shorts" class="page"></div>
+    <div id="page-profile" class="page">
+        <div class="profile-header">
+            <img id="prof-avatar" class="avatar" style="width: 100px; height: 100px; margin-bottom: 15px;">
+            <h2 id="prof-name">Завантаження...</h2>
+            <button class="btn-secondary" id="btn-logout" style="margin-top: 10px;" onclick="logOut()">Вийти з акаунта</button>
+        </div>
+        <div style="width: 100%;"><h3 style="padding-left: 20px;">Пости користувача:</h3></div>
+        <div id="profile-grid" style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; width: 100%;"></div>
     </div>
-    <hr>
-    <h3>Мої пости та репости</h3>
-    <div id="profile-posts" class="content-grid"></div>
+</main>
+
+<div id="auth-modal" class="modal-overlay">
+    <div class="modal">
+        <h2 style="margin:0; text-align:center;">Авторизація</h2>
+        <input type="text" id="auth-nick" placeholder="Введіть ваш Нікнейм (без пробілів)">
+        <input type="password" id="auth-pass" placeholder="Пароль (мінімум 6 символів)">
+        <button class="btn-primary" onclick="handleAuth('login')">Увійти</button>
+        <button class="btn-secondary" onclick="handleAuth('register')">Створити акаунт</button>
+        <button class="btn-secondary" style="background: transparent; border: 1px solid #555;" onclick="hideModal('auth-modal')">Закрити</button>
+        <div id="auth-error" style="color: var(--accent); font-size: 12px; text-align: center;"></div>
+    </div>
 </div>
 
-<div id="auth-modal" class="modal">
-    <h3>Вхід/Реєстрація</h3>
-    <input type="text" id="nick-input" placeholder="Твій Нікнейм">
-    <input type="password" id="pass-input" placeholder="Пароль">
-    <button onclick="handleAuth('login')">Увійти</button>
-    <button onclick="handleAuth('reg')" style="background: #2196F3;">Створити акаунт</button>
-</div>
-
-<div id="upload-modal" class="modal">
-    <h3>Новий пост</h3>
-    <input type="file" id="file-input" accept="image/*,video/*">
-    <textarea id="desc-input" placeholder="Опис поста..."></textarea>
-    <input type="text" id="tags-input" placeholder="Теги (через пробіл)" onkeyup="tagHints(this)">
-    <div id="autocomplete-box"></div>
-    <button onclick="startUpload()">Завантажити</button>
-    <button onclick="this.parentElement.style.display='none'">Закрити</button>
+<div id="upload-modal" class="modal-overlay">
+    <div class="modal">
+        <h2 style="margin:0;">Новий пост</h2>
+        <label style="font-size: 12px; color: var(--text-muted);">1. Файл (Картинка або легке відео)</label>
+        <input type="file" id="up-file" accept="image/*,video/*">
+        
+        <div style="text-align:center; color: var(--text-muted); font-size: 12px;">АБО</div>
+        
+        <label style="font-size: 12px; color: var(--text-muted);">2. Пряме посилання (наприклад з Catbox)</label>
+        <input type="text" id="up-url" placeholder="https://files.catbox.moe/...">
+        
+        <textarea id="up-desc" placeholder="Опис поста..." rows="3"></textarea>
+        <button class="btn-primary" id="btn-submit-post" onclick="submitPost()">Опублікувати</button>
+        <button class="btn-secondary" onclick="hideModal('upload-modal')">Скасувати</button>
+        <div id="up-status" style="color: #2ed573; font-size: 14px; text-align: center; font-weight: bold;"></div>
+    </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
 
 <script>
-    // --- API ТА КОНФІГ ---
+    // === ІНІЦІАЛІЗАЦІЯ БАЗИ ===
     const firebaseConfig = {
         apiKey: "AIzaSyAu8tzzrqKizHt2_0_-6r6DJU02szqtgEA",
         authDomain: "fir-3fa84.firebaseapp.com",
         projectId: "fir-3fa84",
         databaseURL: "https://fir-3fa84-default-rtdb.firebaseio.com/",
-        storageBucket: "fir-3fa84.firebasestorage.app",
-        messagingSenderId: "725404219596",
-        appId: "1:725404219596:web:34ab5087aeed5b9bb1aa69"
+        storageBucket: "fir-3fa84.firebasestorage.app"
     };
-    firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+    const auth = firebase.auth();
     const db = firebase.database();
     const imgbbKey = "120a27bcbb28d3ffd9f03bc4b32bb54f";
-    const client = new WebTorrent();
 
-    // --- ЛОГІКА АВТОРИЗАЦІЇ ---
-    function nickToEmail(nick) {
-        return nick.toLowerCase().replace(/\s+/g, '') + "@anon.ru";
+    // === ГЛОБАЛЬНІ ЗМІННІ ===
+    let currentUserNick = null;
+    let allPosts = []; // Локальний кеш постів для швидкого рендеру
+
+    // === ЛОГІКА UI (Вкладки та Модалки) ===
+    function switchTab(tabId, btnElement) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('page-' + tabId).classList.add('active');
+        if(btnElement) btnElement.classList.add('active');
+        renderPosts(); // Перемальовуємо контент під поточну вкладку
     }
 
-    async function handleAuth(type) {
-        const nick = document.getElementById('nick-input').value;
-        const pass = document.getElementById('pass-input').value;
-        const email = nickToEmail(nick);
+    function showModal(id) { 
+        document.getElementById(id).style.display = 'flex'; 
+        document.getElementById('auth-error').innerText = '';
+    }
+    function hideModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    function openProfile(nick = currentUserNick) {
+        if (!nick) {
+            showModal('auth-modal');
+            return;
+        }
+        document.getElementById('prof-name').innerText = "@" + nick;
+        document.getElementById('prof-avatar').src = `https://ui-avatars.com/api/?name=${nick}&background=random`;
+        document.getElementById('btn-logout').style.display = (nick === currentUserNick) ? 'block' : 'none';
+        
+        switchTab('profile', null);
+        renderProfileGrid(nick);
+    }
+
+    // === АВТОРИЗАЦІЯ ===
+    function nickToEmail(nick) {
+        // Конвертує нік у формат пошти для Firebase (тільки латиниця і цифри)
+        const cleanNick = nick.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        return cleanNick + "@anon.ru";
+    }
+
+    async function handleAuth(action) {
+        const rawNick = document.getElementById('auth-nick').value;
+        const pass = document.getElementById('auth-pass').value;
+        const errBox = document.getElementById('auth-error');
+        
+        if (rawNick.length < 3) return errBox.innerText = "Нік надто короткий!";
+        
+        const email = nickToEmail(rawNick);
+        const displayNick = rawNick.trim(); // Нік, який будуть бачити всі
 
         try {
-            if(type === 'reg') {
-                await firebase.auth().createUserWithEmailAndPassword(email, pass);
-                await db.ref('users/' + nick).set({ nick: nick, bio: "Привіт!", avatar: "" });
+            if (action === 'register') {
+                await auth.createUserWithEmailAndPassword(email, pass);
+                // Зберігаємо оригінальний нік у базу
+                await db.ref('users/' + auth.currentUser.uid).set({ nickname: displayNick });
             } else {
-                await firebase.auth().signInWithEmailAndPassword(email, pass);
+                await auth.signInWithEmailAndPassword(email, pass);
             }
-            document.getElementById('auth-modal').style.display = 'none';
-        } catch(e) { alert(e.message); }
+            hideModal('auth-modal');
+            document.getElementById('auth-nick').value = '';
+            document.getElementById('auth-pass').value = '';
+        } catch (error) {
+            errBox.innerText = "Помилка: " + error.message;
+        }
     }
 
-    firebase.auth().onAuthStateChanged(user => {
-        const uBtn = document.getElementById('upload-btn');
-        if(user) {
-            const nick = user.email.split('@')[0];
-            document.getElementById('my-nick').innerText = nick;
-            uBtn.style.display = 'block';
-            syncProfile(nick);
+    function logOut() {
+        auth.signOut();
+        switchTab('booru', document.querySelectorAll('.tab-btn')[0]);
+    }
+
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            // Дістаємо красивий нік з бази
+            db.ref('users/' + user.uid).once('value').then(snap => {
+                currentUserNick = snap.val()?.nickname || user.email.split('@')[0];
+                document.getElementById('nav-nick').innerText = currentUserNick;
+                document.getElementById('nav-avatar').src = `https://ui-avatars.com/api/?name=${currentUserNick}&background=random`;
+                document.getElementById('nav-upload-btn').style.display = 'block';
+            });
         } else {
-            document.getElementById('my-nick').innerText = "Увійти";
-            uBtn.style.display = 'none';
+            currentUserNick = null;
+            document.getElementById('nav-nick').innerText = "Увійти";
+            document.getElementById('nav-avatar').src = "https://ui-avatars.com/api/?name=Guest&background=random";
+            document.getElementById('nav-upload-btn').style.display = 'none';
         }
-        loadAllContent();
     });
 
-    // --- СТИСНЕННЯ ТА ЗАВАНТАЖЕННЯ ---
-    async function startUpload() {
-        const file = document.getElementById('file-input').files[0];
-        if(!file) return;
-
-        // Стиснення фото на стороні клієнта
-        let uploadFile = file;
-        if(file.type.startsWith('image/')) {
-            uploadFile = await compressImage(file);
-        }
-
-        const isVideo = file.type.startsWith('video/');
-        let finalUrl = "";
-
-        if(isVideo) {
-            // Завантаження відео на Catbox
-            const fd = new FormData();
-            fd.append('reqtype', 'fileupload');
-            fd.append('fileToUpload', file);
-            finalUrl = await fetch('https://corsproxy.io/?https://catbox.moe/user/api.php', { method:'POST', body:fd }).then(r => r.text());
-        } else {
-            // Фото на ImgBB
-            const fd = new FormData();
-            fd.append('image', uploadFile);
-            fd.append('key', imgbbKey);
-            const res = await fetch('https://api.imgbb.com/1/upload', { method:'POST', body:fd }).then(r => r.json());
-            finalUrl = res.data.url;
-        }
-
-        // Визначаємо орієнтацію (горизонтальне/вертикальне)
-        const type = await getOrientation(file);
+    // === ЗАВАНТАЖЕННЯ ПОСТА ===
+    async function submitPost() {
+        if (!currentUserNick) return alert("Треба увійти в акаунт!");
         
-        const nick = firebase.auth().currentUser.email.split('@')[0];
-        await db.ref('posts').push({
-            url: finalUrl,
-            author: nick,
-            desc: document.getElementById('desc-input').value,
-            tags: document.getElementById('tags-input').value,
-            type: type, // 'horizontal' або 'vertical'
-            mime: file.type,
-            likes: 0,
-            timestamp: Date.now()
-        });
+        const file = document.getElementById('up-file').files[0];
+        const urlInput = document.getElementById('up-url').value.trim();
+        const desc = document.getElementById('up-desc').value.trim();
+        const statusBox = document.getElementById('up-status');
+        const btn = document.getElementById('btn-submit-post');
 
-        location.reload();
-    }
+        if (!file && !urlInput) return alert("Оберіть файл або вставте посилання!");
 
-    function compressImage(file) {
-        return new Promise(res => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = e => {
-                const img = new Image();
-                img.src = e.target.result;
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    canvas.width = 800; // Максимальна ширина
-                    canvas.height = (img.height / img.width) * 800;
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    canvas.toBlob(blob => res(blob), 'image/jpeg', 0.6); // 60% якість
-                };
-            };
-        });
-    }
+        btn.disabled = true;
+        let finalUrl = urlInput;
+        let fileType = "image"; // за замовчуванням
+        let format = "horizontal";
 
-    // --- РЕНДЕР ТА P2P ---
-    function loadAllContent() {
-        db.ref('posts').on('value', snap => {
-            const data = snap.val();
-            const booru = document.getElementById('page-booru');
-            const youtube = document.getElementById('page-youtube');
-            const shorts = document.getElementById('page-shorts');
-            
-            booru.innerHTML = ''; youtube.innerHTML = ''; shorts.innerHTML = '';
-
-            Object.keys(data).reverse().forEach(id => {
-                const p = data[id];
-                const html = createCard(p, id);
+        try {
+            if (file) {
+                const isVideo = file.type.startsWith('video/');
+                fileType = isVideo ? "video" : "image";
                 
-                booru.innerHTML += html;
-                if(p.mime.includes('video')) {
-                    if(p.type === 'horizontal') youtube.innerHTML += html;
-                    else shorts.innerHTML += createShort(p, id);
+                if (isVideo) {
+                    statusBox.innerText = "Завантаження відео...";
+                    // Тут використовуємо проксі для Catbox (як ти просив)
+                    const fd = new FormData();
+                    fd.append('reqtype', 'fileupload');
+                    fd.append('fileToUpload', file);
+                    finalUrl = await fetch('https://corsproxy.io/?https://catbox.moe/user/api.php', { method: 'POST', body: fd }).then(r => r.text());
+                    if(!finalUrl.startsWith('http')) throw new Error("Помилка Catbox. Файл завеликий?");
+                } else {
+                    statusBox.innerText = "Завантаження картинки...";
+                    const fd = new FormData();
+                    fd.append('image', file);
+                    fd.append('key', imgbbKey);
+                    const res = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: fd }).then(r => r.json());
+                    if(!res.success) throw new Error("Помилка ImgBB");
+                    finalUrl = res.data.url;
                 }
                 
-                // P2P Seeding (якщо браузер підтримує)
-                if(client.capabilities.webrtc) {
-                    client.seed(p.url, { name: id }, torrent => console.log('Seeding: ' + id));
+                // Визначаємо орієнтацію (горизонтальне/вертикальне) для відео
+                if (isVideo) {
+                    format = await new Promise(resolve => {
+                        const v = document.createElement('video');
+                        v.src = URL.createObjectURL(file);
+                        v.onloadedmetadata = () => resolve(v.videoWidth > v.videoHeight ? "horizontal" : "vertical");
+                    });
                 }
+            } else if (finalUrl) {
+                // Якщо користувач вставив посилання
+                fileType = (finalUrl.endsWith('.mp4') || finalUrl.endsWith('.webm')) ? "video" : "image";
+                // Для посилань ставимо вертикальне навмання, бо не можемо прочитати метадані до завантаження
+                format = "vertical"; 
+            }
+
+            statusBox.innerText = "Збереження в базу...";
+            await db.ref('posts').push({
+                url: finalUrl,
+                type: fileType,
+                format: format,
+                desc: desc,
+                author: currentUserNick,
+                likes: 0,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
             });
+
+            statusBox.innerText = "Успішно!";
+            setTimeout(() => {
+                hideModal('upload-modal');
+                document.getElementById('up-file').value = '';
+                document.getElementById('up-url').value = '';
+                document.getElementById('up-desc').value = '';
+                statusBox.innerText = '';
+                btn.disabled = false;
+            }, 1000);
+
+        } catch (error) {
+            statusBox.style.color = "red";
+            statusBox.innerText = error.message;
+            btn.disabled = false;
+        }
+    }
+
+    // === ОТРИМАННЯ ТА ВІДОБРАЖЕННЯ ДАНИХ ===
+    // Слухаємо базу ПОСТІЙНО, зберігаємо в масив, а потім малюємо
+    db.ref('posts').orderByChild('timestamp').on('value', snap => {
+        allPosts = [];
+        snap.forEach(childSnap => {
+            allPosts.push({ id: childSnap.key, ...childSnap.val() });
+        });
+        allPosts.reverse(); // Нові зверху
+        renderPosts();
+    });
+
+    function renderPosts() {
+        const booru = document.getElementById('page-booru');
+        const yt = document.getElementById('page-youtube');
+        const shorts = document.getElementById('page-shorts');
+        
+        // Очищаємо контейнери
+        booru.innerHTML = ''; yt.innerHTML = ''; shorts.innerHTML = '';
+
+        allPosts.forEach(post => {
+            // 1. Усі пости йдуть на борду
+            booru.innerHTML += createStandardCard(post);
+            
+            // 2. Якщо це відео, сортуємо у YouTube або Shorts
+            if (post.type === 'video') {
+                if (post.format === 'horizontal') {
+                    yt.innerHTML += createStandardCard(post);
+                } else {
+                    shorts.innerHTML += createShortVideo(post);
+                }
+            }
         });
     }
 
-    function createCard(p, id) {
-        const isVid = p.mime.includes('video');
-        const media = isVid ? `<video src="${p.url}" muted onmouseover="this.play()" onmouseout="this.pause()"></video>` : `<img src="${p.url}">`;
+    function renderProfileGrid(nick) {
+        const grid = document.getElementById('profile-grid');
+        grid.innerHTML = '';
+        const userPosts = allPosts.filter(p => p.author === nick);
+        if (userPosts.length === 0) {
+            grid.innerHTML = '<p style="color:#666;">Постів ще немає</p>';
+        } else {
+            userPosts.forEach(post => grid.innerHTML += createStandardCard(post));
+        }
+    }
+
+    // === ГЕНЕРАТОРИ HTML ===
+    function createStandardCard(post) {
+        const mediaHtml = post.type === 'video' 
+            ? `<video src="${post.url}" controls preload="metadata"></video>` 
+            : `<img src="${post.url}" loading="lazy">`;
+
         return `
-            <div class="post-card">
-                ${media}
-                <div class="post-meta">
-                    <span class="post-author" onclick="viewProfile('${p.author}')">@${p.author}</span>
-                    <p>${p.desc || ''}</p>
-                    <div style="display:flex; justify-content:space-between">
-                        <span>❤️ ${p.likes || 0}</span>
-                        <span onclick="repost('${id}')">🔄 Репост</span>
+            <div class="post-card" id="post-${post.id}">
+                <div class="post-media">${mediaHtml}</div>
+                <div class="post-info">
+                    <a class="post-author" onclick="openProfile('${post.author}')">@${post.author}</a>
+                    <div class="post-desc">${post.desc || ''}</div>
+                    <div class="post-stats">
+                        <span class="stat-btn" onclick="likePost('${post.id}')">❤️ ${post.likes || 0}</span>
+                        <span class="stat-btn">💬 Комент</span>
                     </div>
                 </div>
             </div>
         `;
     }
 
-    function createShort(p, id) {
+    function createShortVideo(post) {
         return `
-            <div class="short-video-wrapper">
-                <video class="short-v" src="${p.url}" loop autoplay muted playsinline></video>
+            <div class="short-wrapper">
+                <video class="short-video" src="${post.url}" loop controls preload="metadata" onclick="this.paused ? this.play() : this.pause()"></video>
                 <div class="short-ui">
-                    <div class="action-btn" onclick="like('${id}')">❤️</div>
-                    <div class="action-btn" onclick="repost('${id}')">🔄</div>
-                    <div class="action-btn" onclick="viewComments('${id}')">💬</div>
+                    <div class="short-btn" onclick="openProfile('${post.author}')">
+                        <img src="https://ui-avatars.com/api/?name=${post.author}&background=random" style="width:100%; border-radius:50%;">
+                    </div>
+                    <div class="short-btn" onclick="likePost('${post.id}')">
+                        ❤️<span>${post.likes || 0}</span>
+                    </div>
+                    <div class="short-btn">
+                        💬<span>Ком.</span>
+                    </div>
                 </div>
             </div>
         `;
     }
 
-    // --- НАВІГАЦІЯ ---
-    function togglePage(page) {
-        ['booru', 'youtube', 'shorts', 'profile'].forEach(p => {
-            document.getElementById('page-' + p).style.display = (p === page) ? (p === 'shorts' ? 'block' : 'flex') : 'none';
-        });
-        if(page === 'profile' && !firebase.auth().currentUser) {
-            document.getElementById('auth-modal').style.display = 'block';
-        }
-    }
-
-    function getOrientation(file) {
-        return new Promise(res => {
-            if(!file.type.startsWith('video/')) return res('image');
-            const v = document.createElement('video');
-            v.src = URL.createObjectURL(file);
-            v.onloadedmetadata = () => {
-                res(v.videoWidth > v.videoHeight ? 'horizontal' : 'vertical');
-            };
-        });
-    }
-
-    // Підказки тегів (проста реалізація)
-    function tagHints(el) {
-        const box = document.getElementById('autocomplete-box');
-        if(el.value.includes('#') || el.value.length > 2) {
-            box.style.display = 'block';
-            box.style.left = el.offsetLeft + 'px';
-            box.style.top = (el.offsetTop + 35) + 'px';
-            box.innerHTML = '<div class="hint-item">#trending (100)</div><div class="hint-item">#art (50)</div>';
-        } else { box.style.display = 'none'; }
+    // === ІНТЕРАКЦІЇ ===
+    function likePost(postId) {
+        if (!currentUserNick) { showModal('auth-modal'); return; }
+        // Оновлюємо лічильник лайків напряму в Firebase
+        const likeRef = db.ref(`posts/${postId}/likes`);
+        likeRef.transaction(currentLikes => (currentLikes || 0) + 1);
     }
 </script>
 </body>
