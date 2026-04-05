@@ -9,8 +9,86 @@
     <meta name="viewport" content="initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, width=device-width">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
     <link href="css/style.css" rel="stylesheet">
+    <style>
+      #upload-modal { display:none; position:fixed; bottom:20px; right:20px; background:#222; color:#fff; padding:20px; border-radius:10px; box-shadow:0 0 10px #000; z-index:9999; }
+      #upload-modal input, #upload-modal button { margin-top:10px; width:100%; display:block; padding:8px; }
+      #upload-toggle { position:fixed; bottom:20px; right:20px; padding:12px 24px; background:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer; z-index:9998; font-weight:bold; }
+    </style>
   </head>
   <body>
+    <button id="upload-toggle" onclick="document.getElementById('upload-modal').style.display='block'; this.style.display='none';">Загрузить картинку</button>
+    <div id="upload-modal">
+      <h3 style="margin-top:0">Новый пост</h3>
+      <input type="file" id="file-input">
+      <button onclick="uploadMagic()">Отправить</button>
+      <p id="upload-status"></p>
+      <button onclick="document.getElementById('upload-modal').style.display='none'; document.getElementById('upload-toggle').style.display='block';" style="background:#d32f2f; color:white; margin-top:15px;">Закрыть</button>
+    </div>
+
+    <script>
+      // ТВОИ НАСТРОЙКИ
+      var IMGBB_API = "120a27bcbb28d3ffd9f03bc4b32bb54f";
+      var GH_USER = "parmanoid";
+      var GH_REPO = "fembooru-3"; 
+      var GH_TOKEN = "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";
+
+      function encodeUTF8(str) { return btoa(unescape(encodeURIComponent(str))); }
+      function decodeUTF8(str) { return decodeURIComponent(escape(atob(str))); }
+
+      async function uploadMagic() {
+        var file = document.getElementById('file-input').files[0];
+        var status = document.getElementById('upload-status');
+        if(!file) { status.innerText = "Выбери файл!"; return; }
+
+        status.innerText = "Шаг 1: Загрузка на ImgBB...";
+        var formData = new FormData();
+        formData.append('image', file);
+        formData.append('key', IMGBB_API);
+
+        try {
+          var imgRes = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: formData }).then(r => r.json());
+          if(!imgRes.success) throw new Error("Ошибка ImgBB");
+          
+          var newPost = {
+            file_url: imgRes.data.url,
+            preview_url: imgRes.data.thumb.url,
+            preview_width: 150,
+            preview_height: 150,
+            tags: "my_upload"
+          };
+
+          status.innerText = "Шаг 2: Получаем базу с Github...";
+          var ghUrl = "https://api.github.com/repos/" + GH_USER + "/" + GH_REPO + "/contents/posts.json";
+          var headers = { "Authorization": "token " + GH_TOKEN, "Accept": "application/vnd.github.v3+json" };
+          
+          var fileRes = await fetch(ghUrl, { headers: headers }).then(r => r.json());
+          var posts = [];
+          var sha = "";
+          
+          if(fileRes.content) {
+            posts = JSON.parse(decodeUTF8(fileRes.content));
+            sha = fileRes.sha;
+          }
+          
+          posts.unshift(newPost);
+
+          status.innerText = "Шаг 3: Сохраняем обратно...";
+          var updateData = {
+            message: "Авто-загрузка картинки",
+            content: encodeUTF8(JSON.stringify(posts, null, 2)),
+            sha: sha
+          };
+
+          await fetch(ghUrl, { method: "PUT", headers: headers, body: JSON.stringify(updateData) });
+
+          status.innerText = "Готово! Обновляю страницу...";
+          setTimeout(() => location.reload(), 1500);
+
+        } catch (e) {
+          status.innerText = "Ошибка: " + e.message;
+        }
+      }
+    </script>
     <div id="viewport"></div>
     <script id="viewport-tpl" type="text/x-template">
       <div id="head-container" class="container">
@@ -42,17 +120,6 @@
         <section>
           &copy; 2018-{helpers.fullYear} TinyBooru. 由ij2tpl.js走心驱动。
         </section>
-      </div>
-    </script>
-    <script id="post-viewer-tpl" type="text/x-template">
-      <div id="post-viewer">
-        {?posts}
-          {?preview_url}
-            {-}<div class="preview">
-              {-}<a href="{file_url}"><img src="{preview_url}" width="{preview_width}" height="{preview_height}"/></a>
-            {-}</div>
-          {/preview_url}
-        {/posts}
       </div>
     </script>
     <script src="js/lib/vconsole.min.js"></script>
